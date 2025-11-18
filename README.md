@@ -1,6 +1,6 @@
-# AutoFrac
+# AutoFrac-Research
 
-Software to help conception of fractals and study fractal properties.  
+Software for conception and study of fractal structures.  
 The main workflow is to produce a Python file, with this software, containing the topologic description of a fractal.
 The fractal modeler [MODITERE](https://sourcesup.renater.fr/projects/moditere/) is needed to interpret the Python file and visualize the fractal.
 
@@ -10,8 +10,8 @@ Replace the `{path_to_Qt6}` with the path to Qt. Be sure to have Qt6 installed.
 Replace `{NB_CORES}` by the number of cores to use to compile the project.
 
 ```bash
-git clone https://github.com/borisbordeaux/AutoFrac.git
-cd AutoFrac
+git clone https://github.com/borisbordeaux/AutoFrac-Research.git
+cd AutoFrac-Research
 mkdir build
 cd build
 export QT_PATH={path_to_Qt6}/gcc_64
