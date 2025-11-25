@@ -14,7 +14,7 @@ public:
     /**
      * default destructor
      */
-    ~BatchGraphicsItem()  = default;
+    virtual ~BatchGraphicsItem()  = default;
 
     /**
      * initialize the object (must call initializeOpenGLFunctions())

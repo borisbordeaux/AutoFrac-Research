@@ -166,7 +166,7 @@ void BatchFace::setSelectedFace(int faceIndex) {
     m_selectedFace = faceIndex;
 }
 
-he::Face* BatchFace::selectedFace() {
+he::Face* BatchFace::selectedFace() const {
     he::Face* res = nullptr;
 
     if (m_selectedFace - 1 >= 0 && m_selectedFace - 1 < static_cast<qsizetype>(m_mesh->faces().size())) {
@@ -176,11 +176,11 @@ he::Face* BatchFace::selectedFace() {
     return res;
 }
 
-qsizetype BatchFace::findNbOfTriangle(he::Mesh* mesh) {
+qsizetype BatchFace::findNbOfTriangle(he::Mesh const* mesh) {
     qsizetype nb = 0;
 
     //for each face
-    for (he::Face* f: mesh->faces()) {
+    for (he::Face const* f: mesh->faces()) {
         //the number of triangle of a face
         //is the number of edges - 2
         nb += static_cast<qsizetype>(f->nbEdges() - 2);
@@ -190,22 +190,18 @@ qsizetype BatchFace::findNbOfTriangle(he::Mesh* mesh) {
 }
 
 void BatchFace::addFace(he::Face* f, int ID) {
+#define TRIANGLE_FAN 0
+#if TRIANGLE_FAN
     //we compute the number of halfedges
     he::HalfEdge* he = f->halfEdge();
-    he::HalfEdge* temp = f->halfEdge()->next();
-    int nbHe = 1;
+    std::size_t nbHe = f->nbEdges();
 
-    while (temp != he) {
-        temp = temp->next();
-        nbHe++;
-    }
-
-    //we set the origin of the triangles
+    //we set the origin of the triangle fan
     QVector3D pos1 = he->origin()->pos();
 
     //then we can triangulate the face
     //using the origin and the other vertices
-    for (int i = 0; i < nbHe - 2; i++) {
+    for (std::size_t i = 0; i < nbHe - 2; i++) {
         QVector3D pos2 = he->next()->origin()->pos();
         QVector3D pos3 = he->next()->next()->origin()->pos();
 
@@ -217,9 +213,126 @@ void BatchFace::addFace(he::Face* f, int ID) {
 
         he = he->next();
     }
+#else // ear clipping method
+    std::vector<he::Vertex*> vertices = f->allVertices();
+    std::vector<std::size_t> markedVertices;
+    // if the face is selected, we will
+    // throw 1.0 and -1.0 otherwise
+    float isSelected = (ID == m_selectedFace && m_selectedFace != 0) ? 1.0f : -1.0f;
+
+    //find new base
+    QVector3D axisX = (vertices[1]->pos() - vertices[0]->pos()).normalized();
+
+    QVector3D axisZ = { 0, 0, 0 };
+    for (std::size_t i = 0; i < vertices.size(); i++) {
+        const QVector3D& a = vertices[i]->pos();
+        const QVector3D& b = vertices[(i + 1) % vertices.size()]->pos();
+        axisZ.setX(axisZ.x() + (a.y() - b.y()) * (a.z() + b.z()));
+        axisZ.setY(axisZ.y() + (a.z() - b.z()) * (a.x() + b.x()));
+        axisZ.setZ(axisZ.z() + (a.x() - b.x()) * (a.y() + b.y()));
+    }
+    axisZ.normalize();
+
+    QVector3D axisY = QVector3D::crossProduct(axisZ, axisX);
+
+    //canonic base B = { (1,0,0),  (0,1,0),  (0,0,1) }    and     B' = { axisX, axisY, axisZ }
+    QMatrix4x4 P{
+        axisX.x(), axisY.x(), axisZ.x(), 0,
+        axisX.y(), axisY.y(), axisZ.y(), 0,
+        axisX.z(), axisY.z(), axisZ.z(), 0,
+        0, 0, 0, 1
+    };
+    QMatrix4x4 pInv = P.inverted();
+
+    std::size_t indexCurrent = 0;
+    while (markedVertices.size() <= vertices.size() - 3) {
+        // set indexAfter the next unmarked vertex after V0
+        std::size_t indexNext = (indexCurrent + 1) % vertices.size();
+        while (std::find(markedVertices.begin(), markedVertices.end(), indexNext) != markedVertices.end()) {
+            indexNext = (indexNext + 1) % vertices.size();
+        }
+
+        // set indexPrev the previous unmarked vertex before V0
+        std::size_t indexPrev = (indexCurrent + vertices.size() - 1) % vertices.size();
+        while (std::find(markedVertices.begin(), markedVertices.end(), indexPrev) != markedVertices.end()) {
+            indexPrev = (indexPrev + vertices.size() - 1) % vertices.size();
+        }
+
+        QVector3D pos0 = vertices[indexPrev]->pos();
+        QVector3D pos1 = vertices[indexCurrent]->pos();
+        QVector3D pos2 = vertices[indexNext]->pos();
+
+        if (BatchFace::isValidTriangle(vertices[indexPrev], vertices[indexCurrent], vertices[indexNext], f, pInv)) {
+            triangle(pos0, pos1, pos2, static_cast<float>(ID), isSelected);
+            markedVertices.push_back(indexCurrent);
+        }
+
+        // set indexCurrent the next unmarked vertex
+        indexCurrent = (indexCurrent + 1) % vertices.size();
+        while (std::find(markedVertices.begin(), markedVertices.end(), indexCurrent) != markedVertices.end()) {
+            indexCurrent = (indexCurrent + 1) % vertices.size();
+        }
+    }
+#endif
 }
 
-void BatchFace::triangle(QVector3D const& pos1, QVector3D const& pos2, QVector3D const& pos3, float ID, float isSelected) {
+bool BatchFace::isValidTriangle(he::Vertex const* prev, he::Vertex const* current, he::Vertex const* next, he::Face const* face, QMatrix4x4 const& projMatrix) {
+    std::vector<he::Vertex*> vertices = face->allVertices();
+    std::vector<QVector2D> verticesPositions;
+    for (he::Vertex const* v: vertices) {
+        if (v != prev && v != current && v != next) {
+            verticesPositions.push_back((projMatrix * QVector4D(v->pos(), 1.0f)).toVector2D());
+        }
+    }
+    // project to plan of face to check the triangle validity
+    QVector2D p0 = (projMatrix * QVector4D(prev->pos(), 1.0f)).toVector2D();
+    QVector2D p1 = (projMatrix * QVector4D(current->pos(), 1.0f)).toVector2D();
+    QVector2D p2 = (projMatrix * QVector4D(next->pos(), 1.0f)).toVector2D();
+
+    // triangle must be convex
+    // compute angle
+    QVector2D v10 = p0 - p1;
+    QVector2D v12 = p2 - p1;
+
+    float angle = std::atan2(BatchFace::cross2D(v12, v10), QVector2D::dotProduct(v12, v10)) * 360.0f / (2.0f * M_PIf);
+    if (angle <= 0.0f)
+        return false;
+
+    // check no points lies into the triangle
+    for (QVector2D const& v: verticesPositions) {
+        if (pointInTriangle(v, p0, p1, p2)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+float BatchFace::cross2D(QVector2D const& u, QVector2D const& v) {
+    return u.x() * v.y() - u.y() * v.x();
+}
+
+bool BatchFace::pointInTriangle(QVector2D const& P, QVector2D const& A, QVector2D const& B, QVector2D const& C) {
+    QVector2D AB = B - A;
+    QVector2D BC = C - B;
+    QVector2D CA = A - C;
+
+    QVector2D AP = P - A;
+    QVector2D BP = P - B;
+    QVector2D CP = P - C;
+
+    float c1 = BatchFace::cross2D(AB, AP);
+    float c2 = BatchFace::cross2D(BC, BP);
+    float c3 = BatchFace::cross2D(CA, CP);
+
+    bool hasNeg = (c1 < 0) || (c2 < 0) || (c3 < 0);
+    bool hasPos = (c1 > 0) || (c2 > 0) || (c3 > 0);
+
+    return !(hasNeg && hasPos);
+}
+
+void BatchFace::triangle(QVector3D const& pos1, QVector3D const& pos2, QVector3D const& pos3, float ID,
+                         float isSelected) {
     //compute the normal of the triangleSphere
     QVector3D n = QVector3D::normal(pos2 - pos1, pos3 - pos2);
 

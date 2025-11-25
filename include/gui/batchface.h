@@ -10,6 +10,8 @@ namespace he {
 class Mesh;
 
 class Face;
+
+class Vertex;
 }
 
 class BatchFace : public BatchGraphicsItem {
@@ -27,14 +29,17 @@ public:
     void setMesh(he::Mesh* mesh);
 
     void setSelectedFace(int faceIndex);
-    he::Face* selectedFace();
+    he::Face* selectedFace() const;
 
     int renderOrder() override;
     int pickingOrder() override;
 
 private:
-    static qsizetype findNbOfTriangle(he::Mesh* mesh);
+    static qsizetype findNbOfTriangle(he::Mesh const* mesh);
     void addFace(he::Face* f, int ID);
+    static bool isValidTriangle(he::Vertex const* prev, he::Vertex const* current, he::Vertex const* next, he::Face const* face, QMatrix4x4 const& projMatrix);
+    static float cross2D(QVector2D const& u, QVector2D const& v);
+    static bool pointInTriangle(QVector2D const& P, QVector2D const& A, QVector2D const& B, QVector2D const& C);
     void triangle(QVector3D const& pos1, QVector3D const& pos2, QVector3D const& pos3, float ID, float isSelected);
     void addVertexFace(QVector3D const& v, QVector3D const& n, float ID, float isSelected);
 
