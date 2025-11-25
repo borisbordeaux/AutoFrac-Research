@@ -245,7 +245,8 @@ void BatchFace::addFace(he::Face* f, int ID) {
     QMatrix4x4 pInv = P.inverted();
 
     std::size_t indexCurrent = 0;
-    while (markedVertices.size() <= vertices.size() - 3) {
+    std::size_t countSinceLastMark = 0;
+    while (markedVertices.size() <= vertices.size() - 3 && countSinceLastMark < vertices.size()) {
         // set indexAfter the next unmarked vertex after V0
         std::size_t indexNext = (indexCurrent + 1) % vertices.size();
         while (std::find(markedVertices.begin(), markedVertices.end(), indexNext) != markedVertices.end()) {
@@ -265,6 +266,8 @@ void BatchFace::addFace(he::Face* f, int ID) {
         if (BatchFace::isValidTriangle(vertices[indexPrev], vertices[indexCurrent], vertices[indexNext], f, pInv)) {
             triangle(pos0, pos1, pos2, static_cast<float>(ID), isSelected);
             markedVertices.push_back(indexCurrent);
+        }else {
+            countSinceLastMark++;
         }
 
         // set indexCurrent the next unmarked vertex
