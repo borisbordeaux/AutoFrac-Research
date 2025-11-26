@@ -20,23 +20,32 @@ QString he::Face::name() const {
 }
 
 QVector3D he::Face::computeNormal() const {
-    //take 3 points of the face
-    QVector3D p1 = this->halfEdge()->origin()->pos();
-    QVector3D p2 = this->halfEdge()->next()->origin()->pos();
-    QVector3D p3 = this->halfEdge()->next()->next()->origin()->pos();
-
-    //then compute the normal of the vectors created using the taken points
-    return QVector3D::normal(p2 - p1, p3 - p2);
+    // Newell's method to compute the normal of any convex or concave polygon
+    // https://wikis.khronos.org/opengl/Calculating_a_Surface_Normal
+    std::vector<he::Vertex*> vertices = this->allVertices();
+    QVector3D normal = { 0, 0, 0 };
+    for (std::size_t i = 0; i < vertices.size(); i++) {
+        const QVector3D& a = vertices[i]->pos();
+        const QVector3D& b = vertices[(i + 1) % vertices.size()]->pos();
+        normal.setX(normal.x() + (a.y() - b.y()) * (a.z() + b.z()));
+        normal.setY(normal.y() + (a.z() - b.z()) * (a.x() + b.x()));
+        normal.setZ(normal.z() + (a.x() - b.x()) * (a.y() + b.y()));
+    }
+    normal.normalize();
+    return normal;
 }
 
 he::Point3D he::Face::computeNormalD() const {
-    //take 3 points of the face
-    he::Point3D p1 = this->halfEdge()->origin()->posD();
-    he::Point3D p2 = this->halfEdge()->next()->origin()->posD();
-    he::Point3D p3 = this->halfEdge()->next()->next()->origin()->posD();
-
-    //then compute the normal of the vectors created using the taken points
-    he::Point3D normal = he::Point3D::crossProduct(p2 - p1, p3 - p2);
+    // Newell's method to compute the normal of any convex or concave polygon
+    std::vector<he::Vertex*> vertices = this->allVertices();
+    he::Point3D normal = { 0, 0, 0 };
+    for (std::size_t i = 0; i < vertices.size(); i++) {
+        const he::Point3D& a = vertices[i]->posD();
+        const he::Point3D& b = vertices[(i + 1) % vertices.size()]->posD();
+        normal.setX(normal.x() + (a.y() - b.y()) * (a.z() + b.z()));
+        normal.setY(normal.y() + (a.z() - b.z()) * (a.x() + b.x()));
+        normal.setZ(normal.z() + (a.x() - b.x()) * (a.y() + b.y()));
+    }
     normal.normalize();
     return normal;
 }
@@ -77,21 +86,11 @@ std::vector<he::Vertex*> he::Face::allVertices() const {
     return res;
 }
 
-float he::Face::area() {
-    // compute the new basis
-    QVector3D axeX = (m_halfEdge->next()->origin()->pos() - m_halfEdge->origin()->pos()).normalized();
-    QVector3D axeZ = this->computeNormal();
-    QVector3D axeY = QVector3D::crossProduct(axeZ, axeX);
-
-    // row major order
-    QMatrix4x4 invTransMat = QMatrix4x4(axeX.x(), axeY.x(), axeZ.x(), 0,
-                                        axeX.y(), axeY.y(), axeZ.y(), 0,
-                                        axeX.z(), axeY.z(), axeZ.z(), 0,
-                                        0, 0, 0, 1).inverted();
-
+float he::Face::area() const {
     float res = 0.0f;
     he::HalfEdge* he = this->m_halfEdge;
     he::HalfEdge* heNxt = he;
+    QMatrix4x4 invTransMat = this->basisChangeMatrix();
     do {
         QVector4D p1 = invTransMat * QVector4D(heNxt->origin()->pos(), 1.0f);
         QVector4D p2 = invTransMat * QVector4D(heNxt->next()->origin()->pos(), 1.0f);
@@ -133,4 +132,24 @@ he::Point3D he::Face::computePolar() const {
     double d = he::Point3D::dotProduct(n, p);
     n /= d;
     return n;
+}
+
+QMatrix4x4 he::Face::basisChangeMatrix() const {
+    he::Vertex* v0 = m_halfEdge->origin();
+    he::Vertex* v1 = m_halfEdge->next()->origin();
+    QVector3D axisX = (v1->pos() - v0->pos()).normalized();
+
+    QVector3D axisZ = this->computeNormal();
+
+    QVector3D axisY = QVector3D::crossProduct(axisZ, axisX);
+
+    // canonic basis B = { (1,0,0),  (0,1,0),  (0,0,1) }    and     B' = { axisX, axisY, axisZ }
+    QMatrix4x4 P {
+            axisX.x(), axisY.x(), axisZ.x(), 0,
+            axisX.y(), axisY.y(), axisZ.y(), 0,
+            axisX.z(), axisY.z(), axisZ.z(), 0,
+            0, 0, 0, 1
+    };
+    QMatrix4x4 pInv = P.inverted();
+    return pInv;
 }

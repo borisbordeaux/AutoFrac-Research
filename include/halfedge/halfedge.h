@@ -90,11 +90,28 @@ public:
      */
     void setName(QString const& name);
 
+    /**
+     * getter
+     * @return the length of the edge
+     */
     float length() const;
 
+    /**
+     * getter
+     * @return the string version of this edge (mainly for debugging purpose)
+     */
     QString toString() const;
 
+    /**
+     * getter
+     * @return the userdata attached to this face
+     */
     QString userData() const;
+
+    /**
+     * setter
+     * @param data the new userdata to set for this face
+     */
     void setUserData(QString const& data);
 
 private:
