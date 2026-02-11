@@ -2,13 +2,17 @@
 
 Software for conception and study of fractal structures.  
 The main workflow is to produce a Python file, with this software, containing the topologic description of a fractal.
-The fractal modeler [MODITERE](https://sourcesup.renater.fr/projects/moditere/) is needed to interpret the Python file and visualize the fractal.
+The fractal modeler [MODITERE](https://sourcesup.renater.fr/projects/moditere/) is needed to interpret the Python file and visualize the fractal.  
+I made this software during my PhD [[1]](#1).
 
 ## How to build
- 
-Replace the `{path_to_Qt6}` with the path to Qt. Be sure to have Qt6 installed.  
-Replace `{NB_CORES}` by the number of cores to use to compile the project.
 
+You need to install some dependencies:
+```bash
+sudo apt install qt6-base-dev qt-charts-dev libopencv-dev libboost-dev libgmp-dev
+```
+
+If you have Qt6 installed by the Qt Online Installer, you need to replace the `{path_to_Qt6}` with the path to Qt.
 ```bash
 git clone https://github.com/borisbordeaux/AutoFrac-Research.git
 cd AutoFrac-Research
@@ -18,8 +22,17 @@ export QT_PATH={path_to_Qt6}/gcc_64
 cmake -DCMAKE_BUILD_TYPE=Release ..
 make -j {NB_CORES}
 ```
-
 For an integration within an IDE, be sure to set the `QT_PATH` environment variable for the project.
+
+If Qt6 is installed by your system package manager, you can ignore the `export ...` command and just do the following commands:
+```bash
+git clone https://github.com/borisbordeaux/AutoFrac-Research.git
+cd AutoFrac-Research
+mkdir build
+cd build
+cmake -DCMAKE_BUILD_TYPE=Release ..
+make -j {NB_CORES}
+```
 
 ## Main features
 
@@ -29,7 +42,7 @@ The following content of this file describes the main functionalities implemente
 ### Fractal conception from their boundary
 
 This software allows to conceive fractal faces by describing the fractal behavior of their edges.
-See [[1]](#1) for more theoretical information on how it is done.
+See [[2]](#2) for more theoretical information on how it is done.
 
 <img src="img_readme/interface_edit_fractal.png" alt="Interface edition of fractal" width="800px"/>
 
@@ -46,7 +59,7 @@ Here are some fractals conceived by this software.
 
 ### Fractal conception from polyhedron circle packings
 
-This software also allows to conceive fractals using polyhedron circle packings [[2]](#2).
+This software also allows to conceive fractals using polyhedron circle packings [[3]](#3).
 Such packings need a polyhedron, which can be imported as an OBJ file.
 It is possible to visualize the packing, on the plane or directly on the sphere.
 
@@ -64,7 +77,7 @@ This software proposes some measures on fractal structures in the form of OBJ fi
 
 #### Compute the Fractal Dimension
 
-Compute fractal dimension using the box counting method [[3]](#3) on an image.
+Compute fractal dimension using the box counting method [[4]](#4) on an image.
 
 <img src="img_readme/interface_fractal_dim.png" alt="Interface fractal dimension" width="700px"/>
 
@@ -92,16 +105,19 @@ Compute the persistent homology of a structure defined in an OBJ file and displa
 ## References
 
 <a id="1">[1]</a>
+BORDEAUX, Boris. [*Conception automatique de structures lacunaires fractales.*](https://theses.hal.science/tel-05443346/) 2025. Thèse de doctorat. Université Bourgogne Europe.
+
+<a id="2">[2]</a>
 Boris Bordeaux and Christian Gentil.
 Automatic construction of fractal structures with locally controlled lacunarity.
 Journal of WSCG, 32(1-2):1–12, 2024.
 
-<a id="2">[2]</a>
+<a id="3">[3]</a>
 Iván Rasskin.
 Regular polytopes, sphere packings and apollonian sections.
 Geometriae Dedicata, 218(6):105, 2024.
 
-<a id="3">[3]</a>
+<a id="4">[4]</a>
 Kenneth Falconer.
 Fractal geometry : mathematical foundations and applications.
 John Wiley & Sons, 2013.
