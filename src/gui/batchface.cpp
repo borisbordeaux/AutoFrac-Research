@@ -1,7 +1,6 @@
 #include "gui/batchface.h"
 #include "halfedge/mesh.h"
 #include "halfedge/face.h"
-#include "halfedge/halfedge.h"
 #include "halfedge/vertex.h"
 #include <QColor>
 
@@ -176,6 +175,14 @@ he::Face* BatchFace::selectedFace() const {
     return res;
 }
 
+int BatchFace::renderOrder() {
+    return 0;
+}
+
+int BatchFace::pickingOrder() {
+    return 3;
+}
+
 qsizetype BatchFace::findNbOfTriangle(he::Mesh const* mesh) {
     qsizetype nb = 0;
 
@@ -189,7 +196,7 @@ qsizetype BatchFace::findNbOfTriangle(he::Mesh const* mesh) {
     return nb;
 }
 
-void BatchFace::addFace(he::Face* f, int ID) {
+void BatchFace::addFace(he::Face const* f, int ID) {
     // ear clipping method
     std::vector<he::Vertex*> vertices = f->allVertices();
     std::vector<std::size_t> markedVertices;
@@ -258,13 +265,7 @@ bool BatchFace::isValidTriangle(he::Vertex const* prev, he::Vertex const* curren
         return false;
 
     // check no points lies into the triangle
-    for (QVector2D const& v: verticesPositions) {
-        if (pointInTriangle(v, p0, p1, p2)) {
-            return false;
-        }
-    }
-
-    return true;
+    return std::all_of(verticesPositions.begin(), verticesPositions.end(), [&](QVector2D const& v) { return !pointInTriangle(v, p0, p1, p2); });
 }
 
 float BatchFace::cross2D(QVector2D const& u, QVector2D const& v) {
@@ -317,12 +318,4 @@ void BatchFace::addVertexFace(QVector3D const& v, QVector3D const& n, float ID, 
     *p = isSelected;
     //we update the amount of data
     m_count += m_floatsPerVertex;
-}
-
-int BatchFace::renderOrder() {
-    return 0;
-}
-
-int BatchFace::pickingOrder() {
-    return 3;
 }

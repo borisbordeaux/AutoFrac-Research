@@ -36,7 +36,7 @@ public:
 
 private:
     static qsizetype findNbOfTriangle(he::Mesh const* mesh);
-    void addFace(he::Face* f, int ID);
+    void addFace(he::Face const* f, int ID);
     static bool isValidTriangle(he::Vertex const* prev, he::Vertex const* current, he::Vertex const* next, he::Face const* face, QMatrix4x4 const& projMatrix);
     static float cross2D(QVector2D const& u, QVector2D const& v);
     static bool pointInTriangle(QVector2D const& P, QVector2D const& A, QVector2D const& B, QVector2D const& C);

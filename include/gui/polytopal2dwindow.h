@@ -1,7 +1,6 @@
 #ifndef AUTOFRAC_POLYTOPAL2DWINDOW_H
 #define AUTOFRAC_POLYTOPAL2DWINDOW_H
 
-#include <QWidget>
 #include <QTimer>
 #include <QColorDialog>
 #include "halfedge/mesh.h"
@@ -186,7 +185,7 @@ private:
 
     QVector3D m_colorWhiteTheme { 0.0f, 0.0f, 0.0f };
     QVector3D m_colorDarkTheme { 1.0f, 1.0f, 1.0f };
-    QVector3D m_colorWhiteThemeDual { 255. / 255., 0. / 255., 255. / 255. };
+    QVector3D m_colorWhiteThemeDual { 1.0f, 0.0f, 1.0f };
     QVector3D m_colorDarkThemeDual { 1.0f, 0.0f, 0.0f };
     QColorDialog m_colorDialog;
 };

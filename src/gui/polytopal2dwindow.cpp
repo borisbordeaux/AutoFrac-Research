@@ -5,6 +5,7 @@
 #include <QFileDialog>
 #include <QProgressBar>
 #include <iostream>
+#include <chrono>
 #include "gui/glview.h"
 #include "halfedge/objreader.h"
 #include "halfedge/objwriter.h"
@@ -12,7 +13,6 @@
 #include "polytopal/structure.h"
 #include "polytopal/structureprinter.h"
 #include "polytopal/polytopal.h"
-#include "utils/fileprinter.h"
 #include "halfedge/algorithm.h"
 #include "halfedge/halfedge.h"
 #include "halfedge/face.h"
@@ -20,8 +20,8 @@
 #include "gui/circle.h"
 
 Polytopal2DWindow::Polytopal2DWindow(QWidget* parent) :
-        QWidget(parent), ui(new Ui::Polytopal2DWindow), m_statusBar(new QStatusBar(this)),
-        m_openedMesh(false), m_inversionLevel(0), m_circlesIndex(0) {
+    QWidget(parent), ui(new Ui::Polytopal2DWindow), m_statusBar(new QStatusBar(this)),
+    m_openedMesh(false), m_inversionLevel(0), m_circlesIndex(0) {
     ui->setupUi(this);
 
     this->updateEnablementPoly();
@@ -67,12 +67,40 @@ Polytopal2DWindow::~Polytopal2DWindow() {
     delete ui;
 }
 
-void Polytopal2DWindow::setInfo(const std::string& textInfo, int timeoutMs) {
-    m_statusBar->showMessage(textInfo.c_str(), timeoutMs);
+void Polytopal2DWindow::updateCircles() {
+    //if there were circles
+    if (!m_circles.empty()) {
+        int inversionLevel = m_inversionLevel;
+        //clear circles
+        this->slotDisplayAreaCircles();
+        //set circles
+        this->slotDisplayAreaCircles();
+
+        //redo all inversions
+        for (int i = 0; i < inversionLevel; i++) {
+            std::size_t index = m_circlesIndex;
+            m_circlesIndex = m_circles.size();
+            m_nbInversions = poly::computeInversions(m_circles, m_circlesDual, index);
+
+            if (m_nbInversions == 0) { return; }
+
+            m_inversionLevel++;
+        }
+
+        this->updateBatchCircles(false);
+    }
 }
 
-void Polytopal2DWindow::setInfoAdvancement(int percent) {
-    m_progressBar->setValue(percent);
+void Polytopal2DWindow::updateCirclesDual() {
+    //if there were circles
+    if (!m_circlesDual.empty()) {
+        //clear circles
+        this->slotDisplayDualAreaCircles();
+        //set circles
+        this->slotDisplayDualAreaCircles();
+
+        this->updateBatchCircles(true);
+    }
 }
 
 void Polytopal2DWindow::openOBJFile(QString const& file) {
@@ -105,6 +133,143 @@ void Polytopal2DWindow::openOBJFile(QString const& file) {
     }
 }
 
+void Polytopal2DWindow::setInfo(const std::string& textInfo, int timeoutMs) {
+    m_statusBar->showMessage(textInfo.c_str(), timeoutMs);
+}
+
+void Polytopal2DWindow::updateDataFaces() {
+    m_batchFace.updateData();
+}
+
+he::Face* Polytopal2DWindow::selectedFace() {
+    return m_batchFace.selectedFace();
+}
+
+void Polytopal2DWindow::setSelectedFace(int faceIndex) {
+    m_batchFace.setSelectedFace(faceIndex);
+    if (m_batchFace.selectedFace() != nullptr) {
+        this->ui->lineEdit_userData->setText(m_batchFace.selectedFace()->userData());
+        qDebug() << m_batchFace.selectedFace()->toString();
+        qDebug() << "----------------";
+    }
+}
+
+void Polytopal2DWindow::updateDataEdges() {
+    m_batchEdge.updateData();
+}
+
+he::HalfEdge* Polytopal2DWindow::selectedEdge() {
+    return m_batchEdge.selectedEdge();
+}
+
+void Polytopal2DWindow::setSelectedEdge(int edgeIndex) {
+    m_batchEdge.setSelectedEdge(edgeIndex);
+    if (m_batchEdge.selectedEdge() != nullptr) {
+        this->ui->lineEdit_userData->setText(m_batchEdge.selectedEdge()->userData());
+        qDebug() << m_batchEdge.selectedEdge()->toString();
+        if (m_batchEdge.selectedEdge()->twin() != nullptr) {
+            qDebug() << "---" << Qt::endl << m_batchEdge.selectedEdge()->twin()->toString();
+        }
+        qDebug() << "----------------";
+    }
+}
+
+void Polytopal2DWindow::updateDataVertices() {
+    m_batchVertex.updateData();
+}
+
+he::Vertex* Polytopal2DWindow::selectedVertex() {
+    return m_batchVertex.selectedVertex();
+}
+
+he::Vertex* Polytopal2DWindow::selectedVertex2() {
+    return m_batchVertex.selectedVertex2();
+}
+
+void Polytopal2DWindow::setSelectedVertex(int vertexIndex) {
+    m_batchVertex.setSelectedVertex(vertexIndex);
+    if (m_batchVertex.selectedVertex() != nullptr) {
+        this->ui->lineEdit_userData->setText(m_batchVertex.selectedVertex()->userData());
+        qDebug() << m_batchVertex.selectedVertex()->toString();
+        qDebug() << "----------------";
+    }
+}
+
+void Polytopal2DWindow::setSelectedVertex2(int vertexIndex) {
+    m_batchVertex.setSelectedVertex2(vertexIndex);
+}
+
+void Polytopal2DWindow::updateDataCircles() {
+    m_batchCircle.updateData();
+    m_batchCircleDual.updateData();
+}
+
+void Polytopal2DWindow::setSelectedCircle(int circleIndex) {
+    m_batchCircle.setSelectedCircle(circleIndex);
+    if (m_batchCircle.selectedCircle() != nullptr) {
+        gui::Circle* c = m_batchCircle.selectedCircle();
+        poly::InversiveCoordinates ic = m_circles[circleIndex - 1];
+        poly::InversiveCoordinates e4(0, 0, 0, 1);
+        qDebug() << "Inversive coordinates:" << ic.e1() << ic.e2() << ic.e3() << ic.e4();
+        qDebug() << "Radius:" << c->radius() << " oriented radius:" << ic.radius() << " scalar product with itself:" << poly::InversiveCoordinates::scalarProduct(ic, ic) << " scalar product with e4:" << poly::InversiveCoordinates::scalarProduct(e4, ic);
+        qDebug() << "----------------";
+    }
+}
+
+gui::Circle* Polytopal2DWindow::selectedCircle() {
+    return m_batchCircle.selectedCircle();
+}
+
+void Polytopal2DWindow::setSelectedCircleDual(int circleIndex) {
+    m_batchCircleDual.setSelectedCircle(circleIndex);
+    if (m_batchCircleDual.selectedCircle() != nullptr) {
+        qDebug() << "Radius:" << m_batchCircleDual.selectedCircle()->radius() << " real radius:" << m_circlesDual[circleIndex - 1].radius() << " scalar product with itself:" << poly::InversiveCoordinates::scalarProduct(m_circlesDual[circleIndex - 1], m_circlesDual[circleIndex - 1]);
+        qDebug() << "----------------";
+    }
+}
+
+gui::Circle* Polytopal2DWindow::selectedCircleDual() {
+    return m_batchCircleDual.selectedCircle();
+}
+
+void Polytopal2DWindow::updateDataMesh() {
+    this->updateDataFaces();
+    this->updateDataEdges();
+    this->updateDataVertices();
+}
+
+void Polytopal2DWindow::updateData() {
+    this->updateCirclesDual();
+    this->updateCircles();
+    this->updateDataMesh();
+    if (m_batchDebugLine.containsData()) {
+        this->slotDisplayPolar(); // to clear data
+        this->slotDisplayPolar(); // to display polar
+    }
+}
+
+he::Mesh* Polytopal2DWindow::mesh() {
+    return &m_mesh;
+}
+
+void Polytopal2DWindow::removeSelectedCircle() {
+    if (m_batchCircle.selectedCircle() != nullptr) {
+        int id = m_batchCircle.selectedCircleIndex();
+        auto it = m_circles.begin() + id;
+        m_circles.erase(it);
+        m_batchCircle.removeSelectedCircle();
+    }
+}
+
+void Polytopal2DWindow::removeSelectedCircleDual() {
+    if (m_batchCircleDual.selectedCircle() != nullptr) {
+        int id = m_batchCircleDual.selectedCircleIndex();
+        auto it = m_circlesDual.begin() + id;
+        m_circlesDual.erase(it);
+        m_batchCircleDual.removeSelectedCircle();
+    }
+}
+
 [[maybe_unused]] void Polytopal2DWindow::slotOpenOBJFile() {
     m_timerCanonicalize.stop();
     m_progressBar->reset();
@@ -118,6 +283,7 @@ void Polytopal2DWindow::openOBJFile(QString const& file) {
 }
 
 [[maybe_unused]] void Polytopal2DWindow::slotExportAllFaces() {
+    std::chrono::microseconds before = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch());
     poly::Structure structure { m_mesh };
 
     std::ostringstream info;
@@ -125,7 +291,8 @@ void Polytopal2DWindow::openOBJFile(QString const& file) {
     try {
         poly::StructurePrinter structurePrinter(structure, this->ui->checkBox_polytopalPlanarControlPoints->isChecked(), "../output/result_poly.py");
         structurePrinter.exportStruct();
-        info << "[Finished] Result in ../output/result_poly.py";
+        std::chrono::microseconds after = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch());
+        info << "[Finished in " << (after-before).count() << " us] Result in ../output/result_poly.py";
     } catch (std::runtime_error const& error) {
         info << error.what();
     }
@@ -139,6 +306,7 @@ void Polytopal2DWindow::openOBJFile(QString const& file) {
         return;
     }
 
+    std::chrono::microseconds before = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch());
     poly::Structure structure { m_mesh, m_batchFace.selectedFace() };
 
     std::ostringstream info;
@@ -146,7 +314,8 @@ void Polytopal2DWindow::openOBJFile(QString const& file) {
     try {
         poly::StructurePrinter structurePrinter(structure, this->ui->checkBox_polytopalPlanarControlPoints->isChecked(), "../output/result_poly.py");
         structurePrinter.exportStruct();
-        info << "[Finished] Result in ../output/result_poly.py";
+        std::chrono::microseconds after = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch());
+        info << "[Finished in " << (after-before).count() << " us] Result in ../output/result_poly.py";
     } catch (std::runtime_error const& error) {
         info << error.what();
     }
@@ -219,7 +388,7 @@ void Polytopal2DWindow::canonicalizeStep() {
 
     this->updateDataMesh();
 
-    if(m_batchDebugLine.containsData()){
+    if (m_batchDebugLine.containsData()) {
         this->slotDisplayPolar(); // to clear data
         this->slotDisplayPolar(); // to display polar
     }
@@ -316,42 +485,6 @@ void Polytopal2DWindow::canonicalizeStep() {
     }
 }
 
-void Polytopal2DWindow::updateCircles() {
-    //if there were circles
-    if (!m_circles.empty()) {
-        int inversionLevel = m_inversionLevel;
-        //clear circles
-        this->slotDisplayAreaCircles();
-        //set circles
-        this->slotDisplayAreaCircles();
-
-        //redo all inversions
-        for (int i = 0; i < inversionLevel; i++) {
-            std::size_t index = m_circlesIndex;
-            m_circlesIndex = m_circles.size();
-            m_nbInversions = poly::computeInversions(m_circles, m_circlesDual, index);
-
-            if (m_nbInversions == 0) { return; }
-
-            m_inversionLevel++;
-        }
-
-        this->updateBatchCircles(false);
-    }
-}
-
-void Polytopal2DWindow::updateCirclesDual() {
-    //if there were circles
-    if (!m_circlesDual.empty()) {
-        //clear circles
-        this->slotDisplayDualAreaCircles();
-        //set circles
-        this->slotDisplayDualAreaCircles();
-
-        this->updateBatchCircles(true);
-    }
-}
-
 void Polytopal2DWindow::increaseInversion() {
     if (m_circles.empty() || m_circlesDual.empty()) { return; }
 
@@ -375,15 +508,6 @@ void Polytopal2DWindow::increaseInversion() {
             he::writer::writeOBJ(file, m_mesh, m_canonicalized);
         }
     }
-}
-
-void Polytopal2DWindow::updateEnablementPoly() {
-    this->ui->pushButton_ExportAll->setEnabled(m_openedMesh);
-    this->ui->pushButton_ExportSelectedFace->setEnabled(m_openedMesh);
-    this->ui->pushButton_canonizeMesh->setEnabled(m_openedMesh);
-    this->ui->pushButton_displayCircles->setEnabled(m_openedMesh);
-    this->ui->pushButton_displayCirclesDual->setEnabled(m_openedMesh);
-    this->ui->pushButton_OBJFromCircles->setEnabled(!m_batchCircle.circles().empty() && this->ui->checkBox_projectCircles->isChecked());
 }
 
 [[maybe_unused]] void Polytopal2DWindow::slotUpdateLabelPrecision(int value) {
@@ -711,166 +835,11 @@ void Polytopal2DWindow::updateEnablementPoly() {
     m_view->update();
 }
 
-void Polytopal2DWindow::updateDataFaces() {
-    m_batchFace.updateData();
-}
-
-he::Face* Polytopal2DWindow::selectedFace() {
-    return m_batchFace.selectedFace();
-}
-
-void Polytopal2DWindow::setSelectedFace(int faceIndex) {
-    m_batchFace.setSelectedFace(faceIndex);
-    if (m_batchFace.selectedFace() != nullptr) {
-        this->ui->lineEdit_userData->setText(m_batchFace.selectedFace()->userData());
-        qDebug() << m_batchFace.selectedFace()->toString();
-        qDebug() << "----------------";
-    }
-}
-
-void Polytopal2DWindow::updateDataEdges() {
-    m_batchEdge.updateData();
-}
-
-he::HalfEdge* Polytopal2DWindow::selectedEdge() {
-    return m_batchEdge.selectedEdge();
-}
-
-void Polytopal2DWindow::setSelectedEdge(int edgeIndex) {
-    m_batchEdge.setSelectedEdge(edgeIndex);
-    if (m_batchEdge.selectedEdge() != nullptr) {
-        this->ui->lineEdit_userData->setText(m_batchEdge.selectedEdge()->userData());
-        qDebug() << m_batchEdge.selectedEdge()->toString();
-        if (m_batchEdge.selectedEdge()->twin() != nullptr) {
-            qDebug() << "---" << Qt::endl << m_batchEdge.selectedEdge()->twin()->toString();
-        }
-        qDebug() << "----------------";
-    }
-}
-
-void Polytopal2DWindow::updateDataVertices() {
-    m_batchVertex.updateData();
-}
-
-he::Vertex* Polytopal2DWindow::selectedVertex() {
-    return m_batchVertex.selectedVertex();
-}
-
-he::Vertex* Polytopal2DWindow::selectedVertex2() {
-    return m_batchVertex.selectedVertex2();
-}
-
-void Polytopal2DWindow::setSelectedVertex(int vertexIndex) {
-    m_batchVertex.setSelectedVertex(vertexIndex);
-    if (m_batchVertex.selectedVertex() != nullptr) {
-        this->ui->lineEdit_userData->setText(m_batchVertex.selectedVertex()->userData());
-        qDebug() << m_batchVertex.selectedVertex()->toString();
-        qDebug() << "----------------";
-    }
-}
-
-void Polytopal2DWindow::setSelectedVertex2(int vertexIndex) {
-    m_batchVertex.setSelectedVertex2(vertexIndex);
-}
-
-void Polytopal2DWindow::setSelectedCircle(int circleIndex) {
-    m_batchCircle.setSelectedCircle(circleIndex);
-    if (m_batchCircle.selectedCircle() != nullptr) {
-        gui::Circle* c = m_batchCircle.selectedCircle();
-        poly::InversiveCoordinates ic = m_circles[circleIndex - 1];
-        poly::InversiveCoordinates e4(0,0,0,1);
-        qDebug() << "Inversive coordinates:" <<  ic.e1() << ic.e2() << ic.e3() << ic.e4();
-        qDebug() << "Radius:" << c->radius() << " oriented radius:" << ic.radius() << " scalar product with itself:" << poly::InversiveCoordinates::scalarProduct(ic, ic) << " scalar product with e4:" << poly::InversiveCoordinates::scalarProduct(e4, ic);
-        qDebug() << "----------------";
-    }
-}
-
-gui::Circle* Polytopal2DWindow::selectedCircle() {
-    return m_batchCircle.selectedCircle();
-}
-
-void Polytopal2DWindow::setSelectedCircleDual(int circleIndex) {
-    m_batchCircleDual.setSelectedCircle(circleIndex);
-    if (m_batchCircleDual.selectedCircle() != nullptr) {
-        qDebug() << "Radius:" << m_batchCircleDual.selectedCircle()->radius() << " real radius:" << m_circlesDual[circleIndex - 1].radius() << " scalar product with itself:" << poly::InversiveCoordinates::scalarProduct(m_circlesDual[circleIndex - 1], m_circlesDual[circleIndex - 1]);
-        qDebug() << "----------------";
-    }
-}
-
-gui::Circle* Polytopal2DWindow::selectedCircleDual() {
-    return m_batchCircleDual.selectedCircle();
-}
-
-void Polytopal2DWindow::updateDataCircles() {
-    m_batchCircle.updateData();
-    m_batchCircleDual.updateData();
-}
-
-he::Mesh* Polytopal2DWindow::mesh() {
-    return &m_mesh;
-}
-
-void Polytopal2DWindow::updateDataMesh() {
-    this->updateDataFaces();
-    this->updateDataEdges();
-    this->updateDataVertices();
-}
-
-void Polytopal2DWindow::updateData() {
-    this->updateCirclesDual();
-    this->updateCircles();
-    this->updateDataMesh();
-    if(m_batchDebugLine.containsData()){
-        this->slotDisplayPolar(); // to clear data
-        this->slotDisplayPolar(); // to display polar
-    }
-}
-
-void Polytopal2DWindow::updateBatchCircles(bool dual) {
-    if (dual) {
-        m_batchCircleDual.resetCircles();
-        for (poly::InversiveCoordinates const& c: m_circlesDual) {
-            if (this->ui->checkBox_projectCircles->isChecked()) {
-                m_batchCircleDual.addCircle(c.toCircle());
-            } else {
-                m_batchCircleDual.addCircle(c.inverseStereographicProject());
-            }
-        }
-        m_batchCircleDual.updateData();
-    } else {
-        m_batchCircle.resetCircles();
-        for (poly::InversiveCoordinates const& c: m_circles) {
-            if (this->ui->checkBox_projectCircles->isChecked()) {
-                m_batchCircle.addCircle(c.toCircle());
-            } else {
-                m_batchCircle.addCircle(c.inverseStereographicProject());
-            }
-        }
-        m_batchCircle.updateData();
-    }
-
-    //update circles display on sphere and on plane depending on projection
-    if (!this->ui->checkBox_projectCircles->isChecked() && !m_circles.empty()) {
-        m_batchSphere.updateMeshData(m_circles);
-        m_batchPlane.updateMeshData({});
-    } else {
-        m_batchSphere.updateMeshData({});
-        m_batchPlane.updateMeshData(m_circles);
-    }
-}
-
 [[maybe_unused]] void Polytopal2DWindow::slotChangeMeshColor() {
     if (!m_colorDialog.isVisible()) {
         m_view->initOldMeshColor();
         m_colorDialog.setVisible(true);
     }
-}
-
-void Polytopal2DWindow::closeEvent(QCloseEvent* event) {
-    if (m_colorDialog.isVisible()) {
-        m_colorDialog.close();
-    }
-    QWidget::closeEvent(event);
 }
 
 [[maybe_unused]] void Polytopal2DWindow::slotChangeMeshTransparency(int value) {
@@ -935,6 +904,59 @@ void Polytopal2DWindow::closeEvent(QCloseEvent* event) {
     }
     m_batchDebugLine.update();
     m_view->update();
+}
+
+void Polytopal2DWindow::closeEvent(QCloseEvent* event) {
+    if (m_colorDialog.isVisible()) {
+        m_colorDialog.close();
+    }
+    QWidget::closeEvent(event);
+}
+
+void Polytopal2DWindow::updateEnablementPoly() {
+    this->ui->pushButton_ExportAll->setEnabled(m_openedMesh);
+    this->ui->pushButton_ExportSelectedFace->setEnabled(m_openedMesh);
+    this->ui->pushButton_canonizeMesh->setEnabled(m_openedMesh);
+    this->ui->pushButton_displayCircles->setEnabled(m_openedMesh);
+    this->ui->pushButton_displayCirclesDual->setEnabled(m_openedMesh);
+    this->ui->pushButton_OBJFromCircles->setEnabled(!m_batchCircle.circles().empty() && this->ui->checkBox_projectCircles->isChecked());
+}
+
+void Polytopal2DWindow::setInfoAdvancement(int percent) {
+    m_progressBar->setValue(percent);
+}
+
+void Polytopal2DWindow::updateBatchCircles(bool dual) {
+    if (dual) {
+        m_batchCircleDual.resetCircles();
+        for (poly::InversiveCoordinates const& c: m_circlesDual) {
+            if (this->ui->checkBox_projectCircles->isChecked()) {
+                m_batchCircleDual.addCircle(c.toCircle());
+            } else {
+                m_batchCircleDual.addCircle(c.inverseStereographicProject());
+            }
+        }
+        m_batchCircleDual.updateData();
+    } else {
+        m_batchCircle.resetCircles();
+        for (poly::InversiveCoordinates const& c: m_circles) {
+            if (this->ui->checkBox_projectCircles->isChecked()) {
+                m_batchCircle.addCircle(c.toCircle());
+            } else {
+                m_batchCircle.addCircle(c.inverseStereographicProject());
+            }
+        }
+        m_batchCircle.updateData();
+    }
+
+    //update circles display on sphere and on plane depending on projection
+    if (!this->ui->checkBox_projectCircles->isChecked() && !m_circles.empty()) {
+        m_batchSphere.updateMeshData(m_circles);
+        m_batchPlane.updateMeshData({});
+    } else {
+        m_batchSphere.updateMeshData({});
+        m_batchPlane.updateMeshData(m_circles);
+    }
 }
 
 void Polytopal2DWindow::initAnimationProjection() {
@@ -1064,23 +1086,5 @@ void Polytopal2DWindow::animatingInversion() {
 
         m_batchCircle.updateData();
         m_view->update();
-    }
-}
-
-void Polytopal2DWindow::removeSelectedCircle() {
-    if (m_batchCircle.selectedCircle() != nullptr) {
-        int id = m_batchCircle.selectedCircleIndex();
-        auto it = m_circles.begin() + id;
-        m_circles.erase(it);
-        m_batchCircle.removeSelectedCircle();
-    }
-}
-
-void Polytopal2DWindow::removeSelectedCircleDual() {
-    if (m_batchCircleDual.selectedCircle() != nullptr) {
-        int id = m_batchCircleDual.selectedCircleIndex();
-        auto it = m_circlesDual.begin() + id;
-        m_circlesDual.erase(it);
-        m_batchCircleDual.removeSelectedCircle();
     }
 }
