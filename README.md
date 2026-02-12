@@ -7,9 +7,9 @@ I made this software during my PhD [[1]](#1).
 
 ## How to build
 
-You need to install some dependencies:
+You need to install some dependencies (including git-lfs to download all obj files):
 ```bash
-sudo apt install qt6-base-dev qt-charts-dev libopencv-dev libboost-dev libgmp-dev
+sudo apt install qt6-base-dev qt6-charts-dev libopencv-dev libboost-dev libgmp-dev git-lfs
 ```
 
 If you have Qt6 installed by the Qt Online Installer, you need to replace the `{path_to_Qt6}` with the path to Qt.
