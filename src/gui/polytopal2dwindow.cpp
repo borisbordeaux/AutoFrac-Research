@@ -708,8 +708,10 @@ void Polytopal2DWindow::increaseInversion() {
             QVector3D from2 = he2->origin()->pos();
             float angle1 = std::atan2(to1.y() - from1.y(), to1.x() - from1.x());
             float angle2 = std::atan2(to2.y() - from2.y(), to2.x() - from2.x());
-            m_batchDebugLine.addDebugLine(from1, to1);
-            m_batchDebugLine.addDebugLine(from2, to2);
+            if (currentCircle.radius() > 0) {
+                m_batchDebugLine.addDebugLine(from1, to1);
+               m_batchDebugLine.addDebugLine(from2, to2);
+            }
             return angle1 > angle2;
         });
         orderedHalfEdgesOfVertex.emplace_back(halfedges);
