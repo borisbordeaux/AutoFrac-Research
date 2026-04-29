@@ -68,6 +68,7 @@ It is possible to visualize the packing, on the plane or directly on the sphere.
 
 The main idea is to extract the topology of the fractal structure of such packings.
 The associated fractal of the polyhedron can be automatically exported in a Python file, which is the input of the fractal modeler MODITERE.
+See [[4]](#4) for more theoretical information on how it is done.
 
 <img src="img_readme/graphical_abstract.png" alt="Workflow of fractal exportation" width="800px"/>
 
@@ -77,7 +78,7 @@ This software proposes some measures on fractal structures in the form of OBJ fi
 
 #### Compute the Fractal Dimension
 
-Compute fractal dimension using the box counting method [[4]](#4) on an image.
+Compute fractal dimension using the box counting method [[5]](#5) on an image.
 
 <img src="img_readme/interface_fractal_dim.png" alt="Interface fractal dimension" width="700px"/>
 
@@ -118,6 +119,9 @@ Regular polytopes, sphere packings and apollonian sections.
 Geometriae Dedicata, 218(6):105, 2024.
 
 <a id="4">[4]</a>
+BORDEAUX, Boris, GENTIL, Christian, RASSKIN, Iván, et al. Computer-aided design of lacunar fractal polygons. Computer Aided Geometric Design, 2026, p. 102529.
+
+<a id="5">[5]</a>
 Kenneth Falconer.
 Fractal geometry : mathematical foundations and applications.
 John Wiley & Sons, 2013.
